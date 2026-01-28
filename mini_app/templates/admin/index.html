@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель - Грядка</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/admin/admin.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Шапка -->
+        <div class="admin-header">
+            <h1 class="admin-title">Админ-панель</h1>
+            <p class="admin-subtitle">Управление магазином Грядка</p>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Заказов сегодня</div>
+                <div class="stat-value" id="todayOrders">0</div>
+                <div class="stat-change positive">+5% к вчера</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Выручка сегодня</div>
+                <div class="stat-value" id="todayRevenue">0 ₽</div>
+                <div class="stat-change positive">+12% к вчера</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Новых клиентов</div>
+                <div class="stat-value" id="newCustomers">0</div>
+                <div class="stat-change positive">+8% к вчера</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Активных товаров</div>
+                <div class="stat-value" id="activeProducts">0</div>
+            </div>
+        </div>
+
+        <!-- Меню -->
+        <div class="data-table-container">
+            <h2 class="section-title" style="margin-bottom: 16px;">Быстрый доступ</h2>
+            <div class="menu-list">
+                <a href="/admin/products" class="menu-item" style="text-decoration: none; color: inherit;">
+                    <div class="menu-icon">📦</div>
+                    <div class="menu-text">Управление товарами</div>
+                    <div class="menu-arrow">›</div>
+                </a>
+                <a href="/admin/orders" class="menu-item" style="text-decoration: none; color: inherit;">
+                    <div class="menu-icon">🛒</div>
+                    <div class="menu-text">Заказы</div>
+                    <div class="menu-arrow">›</div>
+                </a>
+                <a href="/admin/settings" class="menu-item" style="text-decoration: none; color: inherit;">
+                    <div class="menu-icon">⚙️</div>
+                    <div class="menu-text">Настройки</div>
+                    <div class="menu-arrow">›</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Серверное время -->
+        <div style="margin-top: 20px; text-align: center;">
+            <div class="server-time">
+                Серверное время: <span id="serverTime">--:--:--</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_BASE_URL = window.location.origin;
+
+        // Загрузка статистики
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/stats?telegram_id=${tg.initDataUnsafe.user.id}`);
+                const stats = await response.json();
+                
+                document.getElementById('todayOrders').textContent = stats.total_orders || 0;
+                document.getElementById('todayRevenue').textContent = `${stats.total_revenue?.toFixed(2) || 0} ₽`;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Обновление серверного времени
+        async function updateServerTime() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/server-time`);
+                const data = await response.json();
+                const date = new Date(data.time);
+                document.getElementById('serverTime').textContent = date.toLocaleTimeString('ru-RU');
+            } catch (error) {
+                console.error('Error loading time:', error);
+            }
+        }
+
+        // Инициализация
+        loadStats();
+        updateServerTime();
+        setInterval(updateServerTime, 1000);
+    </script>
+</body>
+</html>

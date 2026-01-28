@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Грядка - Магазин свежих фруктов и овощей</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <!-- Шапка -->
+    <header class="header">
+        <div class="header-left">
+            <img src="/static/images/logo.png" alt="Грядка" class="logo" onerror="this.style.display='none'">
+            <h1 class="app-name">Грядка</h1>
+        </div>
+        <button class="cart-button" onclick="openCart()">
+            <svg class="cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="9" cy="21" r="1"/>
+                <circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+            <span id="cartBadge" class="cart-badge" style="display: none;">0</span>
+        </button>
+    </header>
+
+    <div class="container">
+        <!-- Поиск -->
+        <div class="search-bar">
+            <input 
+                type="text" 
+                id="searchInput"
+                class="search-input" 
+                placeholder="Поиск фруктов..."
+            >
+        </div>
+
+        <!-- Баннеры -->
+        <div class="banners">
+            <div class="banner banner-sale" onclick="selectCategory(null); loadProducts(null, null, 'sale')">
+                <div>
+                    <div class="banner-title">Акции</div>
+                    <div class="banner-discount">-30%</div>
+                    <div class="banner-subtitle">Скидки до 30%</div>
+                </div>
+                <button class="banner-button">Выбрать ›</button>
+            </div>
+            <div class="banner banner-hit" onclick="selectCategory(null); loadProducts(null, null, 'hit')">
+                <div>
+                    <div class="banner-title">Хиты</div>
+                    <div class="banner-discount" style="font-size: 24px;">Популярные</div>
+                    <div class="banner-subtitle">Топ товары</div>
+                </div>
+                <button class="banner-button">Смотреть ›</button>
+            </div>
+        </div>
+
+        <!-- Категории -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">Категории</h2>
+            </div>
+            <div class="categories-scroll" id="categoriesContainer">
+                <!-- Категории будут загружены через JavaScript -->
+                <div class="loading">Загрузка категорий...</div>
+            </div>
+        </section>
+
+        <!-- Популярные товары -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">Популярные товары</h2>
+            </div>
+            <div class="products-grid" id="productsContainer">
+                <!-- Товары будут загружены через JavaScript -->
+                <div class="loading">Загрузка товаров...</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Нижняя навигация -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="navigateTo('')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="nav-label">Главная</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('favorites')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span class="nav-label">Избранное</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('orders')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            <span class="nav-label">Заказы</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('profile')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="nav-label">Профиль</span>
+        </button>
+    </nav>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

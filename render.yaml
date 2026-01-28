@@ -1,0 +1,25 @@
+services:
+  # Web Service для Bot + API
+  - type: web
+    name: gryadka-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: BOT_TOKEN
+        sync: false  # Установите вручную через Render Dashboard
+      - key: ADMIN_ID
+        value: "587362201"
+      - key: DATABASE_URL
+        value: "sqlite+aiosqlite:///./gryadka.db"
+      - key: MINI_APP_URL
+        sync: false  # Установите вручную после деплоя Mini App
+      - key: API_HOST
+        value: "0.0.0.0"
+      - key: API_PORT
+        value: "8000"
+      - key: SECRET_KEY
+        generateValue: true  # Автоматически сгенерирует секретный ключ
