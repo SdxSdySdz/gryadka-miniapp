@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/products", tags=["products"])
 class CategorySchema(BaseModel):
     id: int
     name: str
+    icon: Optional[str] = None
     description: Optional[str] = None
     image: Optional[str] = None
     sort_order: int
