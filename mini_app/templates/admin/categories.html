@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Категории - Админ-панель</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin/admin.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="../config.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Шапка -->
+        <div class="admin-header mobile-header">
+            <button class="back-button" onclick="window.location.href='./index.html'">←</button>
+            <div class="header-content">
+                <h1 class="admin-title">Категории</h1>
+                <p class="admin-subtitle">Управление категориями товаров</p>
+            </div>
+        </div>
+
+        <!-- Кнопка добавления -->
+        <div class="action-bar mobile-action-bar">
+            <button class="btn btn-primary btn-full" onclick="openModal('categoryModal')">
+                <span>+</span> Добавить категорию
+            </button>
+        </div>
+
+        <!-- Список категорий -->
+        <div class="categories-list" id="categoriesList">
+            <div class="loading-spinner">Загрузка...</div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления/редактирования категории -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content mobile-modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="categoryModalTitle">Добавить категорию</h2>
+                <button class="modal-close" onclick="closeModal('categoryModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm" class="form-grid">
+                    <input type="hidden" name="category_id" id="categoryId">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Название *</label>
+                        <input type="text" name="name" id="categoryName" class="form-input" required placeholder="Например: Фрукты">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Иконка (emoji)</label>
+                        <input type="text" name="icon" id="categoryIcon" class="form-input" placeholder="🍎">
+                        <div class="emoji-picker">
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍎')">🍎</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍊')">🍊</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍋')">🍋</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍇')">🍇</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍓')">🍓</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🥕')">🥕</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🥬')">🥬</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🍅')">🍅</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🥒')">🥒</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🌽')">🌽</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🥔')">🥔</button>
+                            <button type="button" class="emoji-btn" onclick="setEmoji('🧅')">🧅</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Порядок сортировки</label>
+                        <input type="number" name="sort_order" id="categorySortOrder" class="form-input" value="0" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_active" id="categoryIsActive" checked>
+                            <span>Активна (отображается в магазине)</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer mobile-footer">
+                <button class="btn btn-secondary btn-half" onclick="closeModal('categoryModal')">Отмена</button>
+                <button class="btn btn-primary btn-half" onclick="saveCategory()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        let categories = [];
+        let editingCategoryId = null;
+
+        // Загрузка категорий
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/products/categories`);
+                categories = await response.json();
+                renderCategories();
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                document.getElementById('categoriesList').innerHTML = `
+                    <div class="error-message">
+                        <p>Ошибка загрузки категорий</p>
+                        <button class="btn btn-primary" onclick="loadCategories()">Повторить</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Отрисовка категорий
+        function renderCategories() {
+            const container = document.getElementById('categoriesList');
+            
+            if (categories.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state-admin">
+                        <div class="empty-state-admin-icon">📁</div>
+                        <div class="empty-state-admin-text">Категорий пока нет</div>
+                        <button class="btn btn-primary" onclick="openModal('categoryModal')">Добавить первую</button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = categories.map(cat => `
+                <div class="category-card ${cat.is_active ? '' : 'inactive'}">
+                    <div class="category-info">
+                        <div class="category-icon">${cat.icon || '📁'}</div>
+                        <div class="category-details">
+                            <div class="category-name">${cat.name}</div>
+                            <div class="category-meta">
+                                ${cat.is_active ? '✅ Активна' : '⏸️ Скрыта'} · Порядок: ${cat.sort_order || 0}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="category-actions">
+                        <button class="action-btn edit" onclick="editCategory(${cat.id})">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
+                        <button class="action-btn delete" onclick="deleteCategory(${cat.id}, '${cat.name}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Открыть модальное окно
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+            editingCategoryId = null;
+            document.getElementById('categoryModalTitle').textContent = 'Добавить категорию';
+            document.getElementById('categoryForm').reset();
+            document.getElementById('categoryIsActive').checked = true;
+        }
+
+        // Закрыть модальное окно
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            editingCategoryId = null;
+        }
+
+        // Установить emoji
+        function setEmoji(emoji) {
+            document.getElementById('categoryIcon').value = emoji;
+        }
+
+        // Редактировать категорию
+        function editCategory(id) {
+            const category = categories.find(c => c.id === id);
+            if (!category) return;
+
+            editingCategoryId = id;
+            document.getElementById('categoryModalTitle').textContent = 'Редактировать категорию';
+            document.getElementById('categoryId').value = id;
+            document.getElementById('categoryName').value = category.name;
+            document.getElementById('categoryIcon').value = category.icon || '';
+            document.getElementById('categorySortOrder').value = category.sort_order || 0;
+            document.getElementById('categoryIsActive').checked = category.is_active;
+
+            document.getElementById('categoryModal').classList.add('active');
+        }
+
+        // Сохранить категорию
+        async function saveCategory() {
+            const name = document.getElementById('categoryName').value.trim();
+            const icon = document.getElementById('categoryIcon').value.trim();
+            const sortOrder = parseInt(document.getElementById('categorySortOrder').value) || 0;
+            const isActive = document.getElementById('categoryIsActive').checked;
+
+            if (!name) {
+                tg.showAlert('Введите название категории');
+                return;
+            }
+
+            const data = {
+                name: name,
+                icon: icon || null,
+                sort_order: sortOrder,
+                is_active: isActive
+            };
+
+            try {
+                let response;
+                if (editingCategoryId) {
+                    // Обновление
+                    response = await fetch(`${API_BASE_URL}/api/admin/categories/${editingCategoryId}?telegram_id=${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Создание
+                    response = await fetch(`${API_BASE_URL}/api/admin/categories?telegram_id=${userId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                if (response.ok) {
+                    tg.showPopup({
+                        title: 'Успешно',
+                        message: editingCategoryId ? 'Категория обновлена' : 'Категория создана',
+                        buttons: [{type: 'ok'}]
+                    });
+                    closeModal('categoryModal');
+                    loadCategories();
+                } else {
+                    const error = await response.json();
+                    tg.showAlert(error.detail || 'Ошибка сохранения');
+                }
+            } catch (error) {
+                console.error('Error saving category:', error);
+                tg.showAlert('Ошибка сохранения');
+            }
+        }
+
+        // Удалить категорию
+        async function deleteCategory(id, name) {
+            tg.showConfirm(`Удалить категорию "${name}"?`, async (confirmed) => {
+                if (!confirmed) return;
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/admin/categories/${id}?telegram_id=${userId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        tg.showPopup({
+                            title: 'Удалено',
+                            message: 'Категория удалена',
+                            buttons: [{type: 'ok'}]
+                        });
+                        loadCategories();
+                    } else {
+                        const error = await response.json();
+                        tg.showAlert(error.detail || 'Ошибка удаления');
+                    }
+                } catch (error) {
+                    console.error('Error deleting category:', error);
+                    tg.showAlert('Ошибка удаления');
+                }
+            });
+        }
+
+        // Инициализация
+        loadCategories();
+    </script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Заказы - Админ-панель</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin/admin.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="../config.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Шапка -->
+        <div class="admin-header mobile-header">
+            <button class="back-button" onclick="window.location.href='./index.html'">←</button>
+            <div class="header-content">
+                <h1 class="admin-title">Заказы</h1>
+                <p class="admin-subtitle">Управление заказами клиентов</p>
+            </div>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filters">
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label>Статус</label>
+                    <select id="filterStatus" onchange="loadOrders()">
+                        <option value="">Все статусы</option>
+                        <option value="pending">Ожидает</option>
+                        <option value="confirmed">Подтвержден</option>
+                        <option value="preparing">Готовится</option>
+                        <option value="delivering">Доставляется</option>
+                        <option value="completed">Выполнен</option>
+                        <option value="cancelled">Отменен</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Список заказов -->
+        <div class="orders-list" id="ordersList">
+            <div class="loading-spinner">Загрузка заказов...</div>
+        </div>
+    </div>
+
+    <!-- Модальное окно деталей заказа -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content mobile-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Заказ #<span id="orderNumber">0</span></h2>
+                <button class="modal-close" onclick="closeModal('orderModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="orderDetails">
+                    <!-- Детали заказа -->
+                </div>
+            </div>
+            <div class="modal-footer mobile-footer">
+                <select id="orderStatusSelect" class="form-input" style="flex: 1;">
+                    <option value="pending">Ожидает</option>
+                    <option value="confirmed">Подтвержден</option>
+                    <option value="preparing">Готовится</option>
+                    <option value="delivering">Доставляется</option>
+                    <option value="completed">Выполнен</option>
+                    <option value="cancelled">Отменен</option>
+                </select>
+                <button class="btn btn-primary" onclick="updateOrderStatus()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        let orders = [];
+        let currentOrderId = null;
+
+        const statusNames = {
+            'pending': { name: 'Ожидает', color: '#FFA726' },
+            'confirmed': { name: 'Подтвержден', color: '#42A5F5' },
+            'preparing': { name: 'Готовится', color: '#AB47BC' },
+            'delivering': { name: 'Доставляется', color: '#26A69A' },
+            'completed': { name: 'Выполнен', color: '#66BB6A' },
+            'cancelled': { name: 'Отменен', color: '#EF5350' }
+        };
+
+        // Загрузка заказов
+        async function loadOrders() {
+            const status = document.getElementById('filterStatus').value;
+            try {
+                let url = `${API_BASE_URL}/api/admin/orders?telegram_id=${userId}`;
+                if (status) url += `&status=${status}`;
+
+                const response = await fetch(url);
+                orders = await response.json();
+                renderOrders();
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('ordersList').innerHTML = `
+                    <div class="error-message">
+                        <p>Ошибка загрузки заказов</p>
+                        <button class="btn btn-primary" onclick="loadOrders()">Повторить</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Отрисовка заказов
+        function renderOrders() {
+            const container = document.getElementById('ordersList');
+
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state-admin">
+                        <div class="empty-state-admin-icon">📋</div>
+                        <div class="empty-state-admin-text">Заказов пока нет</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = orders.map(order => {
+                const status = statusNames[order.status] || { name: order.status, color: '#9E9E9E' };
+                const date = new Date(order.created_at).toLocaleString('ru-RU');
+
+                return `
+                    <div class="order-card" onclick="openOrder(${order.id})">
+                        <div class="order-header">
+                            <div class="order-number">#${order.id}</div>
+                            <div class="order-status" style="background: ${status.color}20; color: ${status.color}">
+                                ${status.name}
+                            </div>
+                        </div>
+                        <div class="order-info">
+                            <div class="order-customer">👤 ${order.customer_name || 'Клиент'}</div>
+                            <div class="order-date">📅 ${date}</div>
+                        </div>
+                        <div class="order-footer">
+                            <div class="order-total">${order.total_amount?.toFixed(2) || 0} ₽</div>
+                            <div class="order-arrow">›</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Открыть заказ
+        async function openOrder(orderId) {
+            currentOrderId = orderId;
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            document.getElementById('orderNumber').textContent = orderId;
+            document.getElementById('orderStatusSelect').value = order.status;
+
+            const date = new Date(order.created_at).toLocaleString('ru-RU');
+
+            document.getElementById('orderDetails').innerHTML = `
+                <div class="order-detail-section">
+                    <div class="detail-label">Клиент</div>
+                    <div class="detail-value">${order.customer_name || 'Не указан'}</div>
+                </div>
+                <div class="order-detail-section">
+                    <div class="detail-label">Телефон</div>
+                    <div class="detail-value">${order.customer_phone || 'Не указан'}</div>
+                </div>
+                <div class="order-detail-section">
+                    <div class="detail-label">Адрес</div>
+                    <div class="detail-value">${order.delivery_address || 'Не указан'}</div>
+                </div>
+                <div class="order-detail-section">
+                    <div class="detail-label">Дата создания</div>
+                    <div class="detail-value">${date}</div>
+                </div>
+                <div class="order-detail-section">
+                    <div class="detail-label">Сумма</div>
+                    <div class="detail-value" style="font-size: 20px; font-weight: bold; color: var(--primary-green);">
+                        ${order.total_amount?.toFixed(2) || 0} ₽
+                    </div>
+                </div>
+                ${order.comment ? `
+                    <div class="order-detail-section">
+                        <div class="detail-label">Комментарий</div>
+                        <div class="detail-value">${order.comment}</div>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('orderModal').classList.add('active');
+        }
+
+        // Закрыть модальное окно
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Обновить статус заказа
+        async function updateOrderStatus() {
+            if (!currentOrderId) return;
+
+            const newStatus = document.getElementById('orderStatusSelect').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/orders/${currentOrderId}/status?telegram_id=${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    tg.showPopup({
+                        title: 'Успешно',
+                        message: 'Статус обновлен',
+                        buttons: [{type: 'ok'}]
+                    });
+                    closeModal('orderModal');
+                    loadOrders();
+                } else {
+                    const error = await response.json();
+                    tg.showAlert(error.detail || 'Ошибка обновления');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                tg.showAlert('Ошибка обновления');
+            }
+        }
+
+        // Инициализация
+        loadOrders();
+    </script>
+
+    <style>
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .order-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .order-card:active {
+            transform: scale(0.98);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .order-number {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .order-status {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .order-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .order-total {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-green);
+        }
+
+        .order-arrow {
+            font-size: 20px;
+            color: var(--text-light);
+        }
+
+        .order-detail-section {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--background-light);
+        }
+
+        .order-detail-section:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+    </style>
+</body>
+</html>

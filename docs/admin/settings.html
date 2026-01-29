@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Настройки - Админ-панель</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin/admin.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="../config.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Шапка -->
+        <div class="admin-header mobile-header">
+            <button class="back-button" onclick="window.location.href='./index.html'">←</button>
+            <div class="header-content">
+                <h1 class="admin-title">Настройки</h1>
+                <p class="admin-subtitle">Настройки магазина</p>
+            </div>
+        </div>
+
+        <!-- Настройки магазина -->
+        <div class="settings-section">
+            <h3 class="section-subtitle">Доставка</h3>
+            <div class="settings-list" id="deliverySettings">
+                <div class="loading-spinner">Загрузка...</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3 class="section-subtitle">Заказы</h3>
+            <div class="settings-list" id="orderSettings">
+                <div class="loading-spinner">Загрузка...</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3 class="section-subtitle">Промокоды</h3>
+            <div class="promo-header">
+                <button class="btn btn-primary btn-full" onclick="openPromoModal()">+ Добавить промокод</button>
+            </div>
+            <div class="settings-list" id="promoList">
+                <div class="loading-spinner">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования настройки -->
+    <div id="settingModal" class="modal">
+        <div class="modal-content mobile-modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="settingModalTitle">Редактировать</h2>
+                <button class="modal-close" onclick="closeModal('settingModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="settingForm">
+                    <input type="hidden" name="key" id="settingKey">
+                    <div class="form-group">
+                        <label class="form-label" id="settingLabel">Значение</label>
+                        <input type="text" name="value" id="settingValue" class="form-input">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer mobile-footer">
+                <button class="btn btn-secondary btn-half" onclick="closeModal('settingModal')">Отмена</button>
+                <button class="btn btn-primary btn-half" onclick="saveSetting()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно промокода -->
+    <div id="promoModal" class="modal">
+        <div class="modal-content mobile-modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="promoModalTitle">Добавить промокод</h2>
+                <button class="modal-close" onclick="closeModal('promoModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="promoForm" class="form-grid">
+                    <input type="hidden" name="promo_id" id="promoId">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Код *</label>
+                        <input type="text" name="code" id="promoCode" class="form-input" 
+                               required placeholder="WELCOME" style="text-transform: uppercase;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Скидка (%) *</label>
+                        <input type="number" name="discount" id="promoDiscount" class="form-input" 
+                               required min="1" max="100" placeholder="10">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Мин. сумма заказа</label>
+                        <input type="number" name="min_order" id="promoMinOrder" class="form-input" 
+                               min="0" placeholder="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Макс. использований</label>
+                        <input type="number" name="max_uses" id="promoMaxUses" class="form-input" 
+                               min="0" placeholder="Без ограничений">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_active" id="promoIsActive" checked>
+                            <span>Активен</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer mobile-footer">
+                <button class="btn btn-secondary btn-half" onclick="closeModal('promoModal')">Отмена</button>
+                <button class="btn btn-primary btn-half" onclick="savePromo()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        let settings = [];
+        let promos = [];
+        let editingPromoId = null;
+
+        const settingLabels = {
+            'min_order_amount': { label: 'Мин. сумма заказа', unit: '₽' },
+            'delivery_cost': { label: 'Стоимость доставки', unit: '₽' },
+            'free_delivery_from': { label: 'Бесплатная доставка от', unit: '₽' },
+            'delivery_radius': { label: 'Радиус доставки', unit: 'км' },
+            'working_hours_start': { label: 'Начало работы', unit: '' },
+            'working_hours_end': { label: 'Конец работы', unit: '' }
+        };
+
+        // Загрузка настроек
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/settings?telegram_id=${userId}`);
+                settings = await response.json();
+                renderSettings();
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Загрузка промокодов
+        async function loadPromos() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/promo-codes?telegram_id=${userId}`);
+                promos = await response.json();
+                renderPromos();
+            } catch (error) {
+                console.error('Error loading promos:', error);
+            }
+        }
+
+        // Отрисовка настроек
+        function renderSettings() {
+            const deliveryKeys = ['delivery_cost', 'free_delivery_from', 'delivery_radius'];
+            const orderKeys = ['min_order_amount', 'working_hours_start', 'working_hours_end'];
+
+            const deliverySettings = settings.filter(s => deliveryKeys.includes(s.key));
+            const orderSettingsData = settings.filter(s => orderKeys.includes(s.key));
+
+            document.getElementById('deliverySettings').innerHTML = renderSettingsList(deliverySettings);
+            document.getElementById('orderSettings').innerHTML = renderSettingsList(orderSettingsData);
+        }
+
+        function renderSettingsList(items) {
+            if (!items || items.length === 0) {
+                return '<div class="empty-state-admin"><p>Настройки не найдены</p></div>';
+            }
+
+            return items.map(setting => {
+                const config = settingLabels[setting.key] || { label: setting.key, unit: '' };
+                return `
+                    <div class="setting-item" onclick="editSetting('${setting.key}', '${setting.value || ''}', '${config.label}')">
+                        <div class="setting-info">
+                            <div class="setting-label">${config.label}</div>
+                            <div class="setting-value">${setting.value || 'Не задано'}${config.unit ? ' ' + config.unit : ''}</div>
+                        </div>
+                        <div class="setting-arrow">›</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Отрисовка промокодов
+        function renderPromos() {
+            const container = document.getElementById('promoList');
+
+            if (!promos || promos.length === 0) {
+                container.innerHTML = '<div class="empty-state-admin"><p>Промокодов нет</p></div>';
+                return;
+            }
+
+            container.innerHTML = promos.map(promo => `
+                <div class="promo-item ${promo.is_active ? '' : 'inactive'}">
+                    <div class="promo-info" onclick="editPromo(${promo.id})">
+                        <div class="promo-code">${promo.code}</div>
+                        <div class="promo-details">
+                            Скидка ${promo.discount_percent}% 
+                            ${promo.min_order_amount ? `· от ${promo.min_order_amount}₽` : ''}
+                            ${promo.is_active ? '' : '· ⏸️ Неактивен'}
+                        </div>
+                    </div>
+                    <button class="action-btn delete" onclick="deletePromo(${promo.id}, '${promo.code}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Редактировать настройку
+        function editSetting(key, value, label) {
+            document.getElementById('settingKey').value = key;
+            document.getElementById('settingValue').value = value;
+            document.getElementById('settingLabel').textContent = label;
+            document.getElementById('settingModalTitle').textContent = label;
+            document.getElementById('settingModal').classList.add('active');
+        }
+
+        // Сохранить настройку
+        async function saveSetting() {
+            const key = document.getElementById('settingKey').value;
+            const value = document.getElementById('settingValue').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/settings/${key}?telegram_id=${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: value })
+                });
+
+                if (response.ok) {
+                    tg.showPopup({
+                        title: 'Успешно',
+                        message: 'Настройка сохранена',
+                        buttons: [{type: 'ok'}]
+                    });
+                    closeModal('settingModal');
+                    loadSettings();
+                } else {
+                    tg.showAlert('Ошибка сохранения');
+                }
+            } catch (error) {
+                console.error('Error saving setting:', error);
+                tg.showAlert('Ошибка сохранения');
+            }
+        }
+
+        // Открыть модальное промокода
+        function openPromoModal() {
+            editingPromoId = null;
+            document.getElementById('promoModalTitle').textContent = 'Добавить промокод';
+            document.getElementById('promoForm').reset();
+            document.getElementById('promoIsActive').checked = true;
+            document.getElementById('promoModal').classList.add('active');
+        }
+
+        // Редактировать промокод
+        function editPromo(id) {
+            const promo = promos.find(p => p.id === id);
+            if (!promo) return;
+
+            editingPromoId = id;
+            document.getElementById('promoModalTitle').textContent = 'Редактировать промокод';
+            document.getElementById('promoId').value = id;
+            document.getElementById('promoCode').value = promo.code;
+            document.getElementById('promoDiscount').value = promo.discount_percent;
+            document.getElementById('promoMinOrder').value = promo.min_order_amount || '';
+            document.getElementById('promoMaxUses').value = promo.max_uses || '';
+            document.getElementById('promoIsActive').checked = promo.is_active;
+            document.getElementById('promoModal').classList.add('active');
+        }
+
+        // Сохранить промокод
+        async function savePromo() {
+            const code = document.getElementById('promoCode').value.trim().toUpperCase();
+            const discount = parseInt(document.getElementById('promoDiscount').value);
+            const minOrder = parseInt(document.getElementById('promoMinOrder').value) || null;
+            const maxUses = parseInt(document.getElementById('promoMaxUses').value) || null;
+            const isActive = document.getElementById('promoIsActive').checked;
+
+            if (!code || !discount) {
+                tg.showAlert('Заполните обязательные поля');
+                return;
+            }
+
+            const data = {
+                code: code,
+                discount_percent: discount,
+                min_order_amount: minOrder,
+                max_uses: maxUses,
+                is_active: isActive
+            };
+
+            try {
+                let response;
+                if (editingPromoId) {
+                    response = await fetch(`${API_BASE_URL}/api/admin/promo-codes/${editingPromoId}?telegram_id=${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    response = await fetch(`${API_BASE_URL}/api/admin/promo-codes?telegram_id=${userId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                if (response.ok) {
+                    tg.showPopup({
+                        title: 'Успешно',
+                        message: editingPromoId ? 'Промокод обновлен' : 'Промокод создан',
+                        buttons: [{type: 'ok'}]
+                    });
+                    closeModal('promoModal');
+                    loadPromos();
+                } else {
+                    const error = await response.json();
+                    tg.showAlert(error.detail || 'Ошибка сохранения');
+                }
+            } catch (error) {
+                console.error('Error saving promo:', error);
+                tg.showAlert('Ошибка сохранения');
+            }
+        }
+
+        // Удалить промокод
+        async function deletePromo(id, code) {
+            tg.showConfirm(`Удалить промокод "${code}"?`, async (confirmed) => {
+                if (!confirmed) return;
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/admin/promo-codes/${id}?telegram_id=${userId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        tg.showPopup({
+                            title: 'Удалено',
+                            message: 'Промокод удален',
+                            buttons: [{type: 'ok'}]
+                        });
+                        loadPromos();
+                    } else {
+                        tg.showAlert('Ошибка удаления');
+                    }
+                } catch (error) {
+                    console.error('Error deleting promo:', error);
+                    tg.showAlert('Ошибка удаления');
+                }
+            });
+        }
+
+        // Закрыть модальное окно
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Инициализация
+        loadSettings();
+        loadPromos();
+    </script>
+
+    <style>
+        .settings-section {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .section-subtitle {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            background: var(--background-light);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .setting-item {
+            background: var(--white);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .setting-item:active {
+            background: var(--background-light);
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+        }
+
+        .setting-value {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .setting-arrow {
+            font-size: 18px;
+            color: var(--text-light);
+        }
+
+        .promo-header {
+            margin-bottom: 12px;
+        }
+
+        .promo-item {
+            background: var(--white);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .promo-item.inactive {
+            opacity: 0.6;
+        }
+
+        .promo-info {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .promo-code {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--primary-green);
+            margin-bottom: 2px;
+        }
+
+        .promo-details {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+    </style>
+</body>
+</html>
