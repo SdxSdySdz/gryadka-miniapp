@@ -80,6 +80,7 @@ class Category(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    icon: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # Emoji иконка
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

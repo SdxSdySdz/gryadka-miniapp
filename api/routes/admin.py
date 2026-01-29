@@ -36,6 +36,7 @@ async def verify_admin(telegram_id: int, session: AsyncSession):
 
 class CategoryCreateSchema(BaseModel):
     name: str
+    icon: Optional[str] = None
     description: Optional[str] = None
     sort_order: int = 0
     is_active: bool = True
