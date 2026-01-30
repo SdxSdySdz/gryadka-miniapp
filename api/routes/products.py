@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from database import get_session
@@ -130,7 +131,7 @@ async def get_products(
     session: AsyncSession = Depends(get_session)
 ):
     """Получить список товаров с фильтрами"""
-    query = select(Product).order_by(Product.sort_order, Product.name)
+    query = select(Product).options(selectinload(Product.images)).order_by(Product.sort_order, Product.name)
     
     # Фильтры
     conditions = []
@@ -193,7 +194,7 @@ async def get_product(
 ):
     """Получить товар по ID"""
     result = await session.execute(
-        select(Product).where(Product.id == product_id)
+        select(Product).options(selectinload(Product.images)).where(Product.id == product_id)
     )
     product = result.scalar_one_or_none()
     
@@ -211,6 +212,7 @@ async def get_popular_products(
     """Получить популярные товары"""
     result = await session.execute(
         select(Product)
+        .options(selectinload(Product.images))
         .where(Product.is_active == True)
         .where(Product.is_available == True)
         .where(Product.badge == BadgeType.HIT.value)
@@ -229,6 +231,7 @@ async def get_sale_products(
     """Получить товары по акции"""
     result = await session.execute(
         select(Product)
+        .options(selectinload(Product.images))
         .where(Product.is_active == True)
         .where(Product.is_available == True)
         .where(Product.badge == BadgeType.SALE.value)
