@@ -1,27 +1,26 @@
 // Главный JavaScript файл для Mini App
 
-// Инициализация Telegram Web App
-const tg = window.Telegram.WebApp;
+// Безопасная инициализация Telegram Web App
+let tg = null;
+let user = null;
+let userId = null;
 
-// Безопасная инициализация Telegram
-function initTelegram() {
-    try {
+try {
+    if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
-    } catch (e) {
-        console.warn('Telegram WebApp init warning:', e);
+        user = tg.initDataUnsafe?.user || null;
+        userId = user ? user.id : null;
     }
+} catch (e) {
+    console.warn('Telegram WebApp init error:', e);
 }
-initTelegram();
-
-// Получаем данные пользователя
-const user = tg.initDataUnsafe?.user;
-const userId = user ? user.id : null;
 
 // Безопасный вызов Telegram методов
 function safeShowAlert(message) {
     try {
-        if (tg.initDataUnsafe?.user) {
+        if (tg && user) {
             tg.showAlert(message);
         } else {
             alert(message);
@@ -33,7 +32,7 @@ function safeShowAlert(message) {
 
 function safeShowPopup(options) {
     try {
-        if (tg.initDataUnsafe?.user) {
+        if (tg && user) {
             tg.showPopup(options);
         } else {
             alert(options.message || options.title);
@@ -349,8 +348,10 @@ function navigateTo(page) {
 async function init() {
     // Показываем загрузку (безопасно)
     try {
-        tg.MainButton.setText('Загрузка...');
-        tg.MainButton.hide();
+        if (tg && tg.MainButton) {
+            tg.MainButton.setText('Загрузка...');
+            tg.MainButton.hide();
+        }
     } catch (e) {
         console.warn('MainButton not available');
     }
