@@ -2,12 +2,46 @@
 
 // Инициализация Telegram Web App
 const tg = window.Telegram.WebApp;
-tg.expand();
-tg.ready();
+
+// Безопасная инициализация Telegram
+function initTelegram() {
+    try {
+        tg.expand();
+        tg.ready();
+    } catch (e) {
+        console.warn('Telegram WebApp init warning:', e);
+    }
+}
+initTelegram();
 
 // Получаем данные пользователя
-const user = tg.initDataUnsafe.user;
+const user = tg.initDataUnsafe?.user;
 const userId = user ? user.id : null;
+
+// Безопасный вызов Telegram методов
+function safeShowAlert(message) {
+    try {
+        if (tg.initDataUnsafe?.user) {
+            tg.showAlert(message);
+        } else {
+            alert(message);
+        }
+    } catch (e) {
+        alert(message);
+    }
+}
+
+function safeShowPopup(options) {
+    try {
+        if (tg.initDataUnsafe?.user) {
+            tg.showPopup(options);
+        } else {
+            alert(options.message || options.title);
+        }
+    } catch (e) {
+        alert(options.message || options.title);
+    }
+}
 
 // API конфигурация
 const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
@@ -42,7 +76,7 @@ async function apiRequest(endpoint, options = {}) {
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-        tg.showAlert(error.message || 'Произошла ошибка');
+        safeShowAlert(error.message || 'Произошла ошибка');
         throw error;
     }
 }
@@ -121,10 +155,10 @@ async function loadSettings() {
 // Добавление в корзину
 async function addToCart(productId, quantity = 1, unit = 'kg') {
     if (!userId) {
-        tg.showAlert('Необходимо авторизоваться');
+        safeShowAlert('Необходимо авторизоваться');
         return;
     }
-    
+
     try {
         await apiRequest(`/api/cart/${userId}`, {
             method: 'POST',
@@ -134,9 +168,9 @@ async function addToCart(productId, quantity = 1, unit = 'kg') {
                 unit: unit
             })
         });
-        
+
         await loadCart();
-        tg.showPopup({
+        safeShowPopup({
             title: 'Успешно',
             message: 'Товар добавлен в корзину',
             buttons: [{type: 'ok'}]
@@ -149,7 +183,7 @@ async function addToCart(productId, quantity = 1, unit = 'kg') {
 // Переключение избранного
 async function toggleFavorite(productId) {
     if (!userId) {
-        tg.showAlert('Необходимо авторизоваться');
+        safeShowAlert('Необходимо авторизоваться');
         return;
     }
     
@@ -313,9 +347,13 @@ function navigateTo(page) {
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
 async function init() {
-    // Показываем загрузку
-    tg.MainButton.setText('Загрузка...');
-    tg.MainButton.hide();
+    // Показываем загрузку (безопасно)
+    try {
+        tg.MainButton.setText('Загрузка...');
+        tg.MainButton.hide();
+    } catch (e) {
+        console.warn('MainButton not available');
+    }
     
     // Загружаем данные
     await Promise.all([
