@@ -8,6 +8,54 @@
     <link rel="stylesheet" href="../static/css/admin/admin.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="../config.js"></script>
+    <style>
+        .category-card {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .category-card:active {
+            transform: scale(0.98);
+        }
+        .category-products-count {
+            background: var(--primary-green);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .add-category-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            font-size: 28px;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+            cursor: pointer;
+            z-index: 100;
+        }
+        .category-edit-btn {
+            background: rgba(76, 175, 80, 0.15);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .category-edit-btn svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-green);
+        }
+    </style>
 </head>
 <body>
     <div class="admin-container">
@@ -16,15 +64,8 @@
             <button class="back-button" onclick="window.location.href='./index.html'">←</button>
             <div class="header-content">
                 <h1 class="admin-title">Категории</h1>
-                <p class="admin-subtitle">Управление категориями товаров</p>
+                <p class="admin-subtitle">Выберите категорию для просмотра товаров</p>
             </div>
-        </div>
-
-        <!-- Кнопка добавления -->
-        <div class="action-bar mobile-action-bar">
-            <button class="btn btn-primary btn-full" onclick="openModal('categoryModal')">
-                <span>+</span> Добавить категорию
-            </button>
         </div>
 
         <!-- Список категорий -->
@@ -32,6 +73,9 @@
             <div class="loading-spinner">Загрузка...</div>
         </div>
     </div>
+
+    <!-- Кнопка добавления категории -->
+    <button class="add-category-btn" onclick="openModal('categoryModal')">+</button>
 
     <!-- Модальное окно добавления/редактирования категории -->
     <div id="categoryModal" class="modal">
@@ -43,12 +87,12 @@
             <div class="modal-body">
                 <form id="categoryForm" class="form-grid">
                     <input type="hidden" name="category_id" id="categoryId">
-                    
+
                     <div class="form-group">
                         <label class="form-label">Название *</label>
                         <input type="text" name="name" id="categoryName" class="form-input" required placeholder="Например: Фрукты">
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Иконка (emoji)</label>
                         <input type="text" name="icon" id="categoryIcon" class="form-input" placeholder="🍎">
@@ -67,12 +111,12 @@
                             <button type="button" class="emoji-btn" onclick="setEmoji('🧅')">🧅</button>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Порядок сортировки</label>
                         <input type="number" name="sort_order" id="categorySortOrder" class="form-input" value="0" min="0">
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="checkbox-label">
                             <input type="checkbox" name="is_active" id="categoryIsActive" checked>
@@ -83,43 +127,63 @@
             </div>
             <div class="modal-footer mobile-footer">
                 <button class="btn btn-secondary btn-half" onclick="closeModal('categoryModal')">Отмена</button>
+                <button class="btn btn-danger btn-half" id="deleteCategoryBtn" style="display: none;" onclick="deleteCurrentCategory()">Удалить</button>
                 <button class="btn btn-primary btn-half" onclick="saveCategory()">Сохранить</button>
             </div>
         </div>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        let tg = null;
+        let userId = null;
+
+        try {
+            tg = window.Telegram.WebApp;
+            tg.expand();
+            tg.ready();
+            userId = tg.initDataUnsafe?.user?.id;
+        } catch(e) {
+            console.warn('Telegram init error:', e);
+        }
 
         const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
-        const userId = tg.initDataUnsafe?.user?.id;
 
         let categories = [];
+        let products = [];
         let editingCategoryId = null;
 
-        // Загрузка категорий
-        async function loadCategories() {
+        // Загрузка данных
+        async function loadData() {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/products/categories`);
-                categories = await response.json();
+                const [catResponse, prodResponse] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/products/categories?include_inactive=true`),
+                    fetch(`${API_BASE_URL}/api/products/?include_inactive=true`)
+                ]);
+
+                categories = await catResponse.json();
+                products = await prodResponse.json();
+
                 renderCategories();
             } catch (error) {
-                console.error('Error loading categories:', error);
+                console.error('Error loading data:', error);
                 document.getElementById('categoriesList').innerHTML = `
                     <div class="error-message">
-                        <p>Ошибка загрузки категорий</p>
-                        <button class="btn btn-primary" onclick="loadCategories()">Повторить</button>
+                        <p>Ошибка загрузки</p>
+                        <button class="btn btn-primary" onclick="loadData()">Повторить</button>
                     </div>
                 `;
             }
         }
 
+        // Подсчёт товаров в категории
+        function getProductsCount(categoryId) {
+            return products.filter(p => p.category_id === categoryId).length;
+        }
+
         // Отрисовка категорий
         function renderCategories() {
             const container = document.getElementById('categoriesList');
-            
+
             if (categories.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state-admin">
@@ -131,33 +195,35 @@
                 return;
             }
 
-            container.innerHTML = categories.map(cat => `
-                <div class="category-card ${cat.is_active ? '' : 'inactive'}">
+            container.innerHTML = categories.map(cat => {
+                const count = getProductsCount(cat.id);
+                return `
+                <div class="category-card ${cat.is_active ? '' : 'inactive'}" onclick="openCategory(${cat.id})">
                     <div class="category-info">
                         <div class="category-icon">${cat.icon || '📁'}</div>
                         <div class="category-details">
                             <div class="category-name">${cat.name}</div>
                             <div class="category-meta">
-                                ${cat.is_active ? '✅ Активна' : '⏸️ Скрыта'} · Порядок: ${cat.sort_order || 0}
+                                ${cat.is_active ? '✅ Активна' : '⏸️ Скрыта'}
                             </div>
                         </div>
                     </div>
-                    <div class="category-actions">
-                        <button class="action-btn edit" onclick="editCategory(${cat.id})">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="category-products-count">${count} товар${count === 1 ? '' : count < 5 ? 'а' : 'ов'}</span>
+                        <button class="category-edit-btn" onclick="event.stopPropagation(); editCategory(${cat.id})">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                             </svg>
                         </button>
-                        <button class="action-btn delete" onclick="deleteCategory(${cat.id}, '${cat.name}')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                        </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
+        }
+
+        // Открыть категорию (перейти к товарам)
+        function openCategory(categoryId) {
+            window.location.href = `./products.html?category_id=${categoryId}`;
         }
 
         // Открыть модальное окно
@@ -167,6 +233,7 @@
             document.getElementById('categoryModalTitle').textContent = 'Добавить категорию';
             document.getElementById('categoryForm').reset();
             document.getElementById('categoryIsActive').checked = true;
+            document.getElementById('deleteCategoryBtn').style.display = 'none';
         }
 
         // Закрыть модальное окно
@@ -192,6 +259,7 @@
             document.getElementById('categoryIcon').value = category.icon || '';
             document.getElementById('categorySortOrder').value = category.sort_order || 0;
             document.getElementById('categoryIsActive').checked = category.is_active;
+            document.getElementById('deleteCategoryBtn').style.display = 'block';
 
             document.getElementById('categoryModal').classList.add('active');
         }
@@ -204,7 +272,7 @@
             const isActive = document.getElementById('categoryIsActive').checked;
 
             if (!name) {
-                tg.showAlert('Введите название категории');
+                alert('Введите название категории');
                 return;
             }
 
@@ -218,14 +286,12 @@
             try {
                 let response;
                 if (editingCategoryId) {
-                    // Обновление
                     response = await fetch(`${API_BASE_URL}/api/admin/categories/${editingCategoryId}?telegram_id=${userId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data)
                     });
                 } else {
-                    // Создание
                     response = await fetch(`${API_BASE_URL}/api/admin/categories?telegram_id=${userId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -234,53 +300,54 @@
                 }
 
                 if (response.ok) {
-                    tg.showPopup({
-                        title: 'Успешно',
-                        message: editingCategoryId ? 'Категория обновлена' : 'Категория создана',
-                        buttons: [{type: 'ok'}]
-                    });
+                    alert(editingCategoryId ? 'Категория обновлена' : 'Категория создана');
                     closeModal('categoryModal');
-                    loadCategories();
+                    loadData();
                 } else {
                     const error = await response.json();
-                    tg.showAlert(error.detail || 'Ошибка сохранения');
+                    alert(error.detail || 'Ошибка сохранения');
                 }
             } catch (error) {
                 console.error('Error saving category:', error);
-                tg.showAlert('Ошибка сохранения');
+                alert('Ошибка сохранения');
             }
         }
 
-        // Удалить категорию
-        async function deleteCategory(id, name) {
-            tg.showConfirm(`Удалить категорию "${name}"?`, async (confirmed) => {
-                if (!confirmed) return;
+        // Удалить текущую категорию
+        async function deleteCurrentCategory() {
+            if (!editingCategoryId) return;
 
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/admin/categories/${id}?telegram_id=${userId}`, {
-                        method: 'DELETE'
-                    });
+            const category = categories.find(c => c.id === editingCategoryId);
+            const count = getProductsCount(editingCategoryId);
 
-                    if (response.ok) {
-                        tg.showPopup({
-                            title: 'Удалено',
-                            message: 'Категория удалена',
-                            buttons: [{type: 'ok'}]
-                        });
-                        loadCategories();
-                    } else {
-                        const error = await response.json();
-                        tg.showAlert(error.detail || 'Ошибка удаления');
-                    }
-                } catch (error) {
-                    console.error('Error deleting category:', error);
-                    tg.showAlert('Ошибка удаления');
+            if (count > 0) {
+                alert(`Нельзя удалить категорию с товарами (${count} шт). Сначала удалите или переместите товары.`);
+                return;
+            }
+
+            if (!confirm(`Удалить категорию "${category?.name}"?`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/categories/${editingCategoryId}?telegram_id=${userId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('Категория удалена');
+                    closeModal('categoryModal');
+                    loadData();
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Ошибка удаления');
                 }
-            });
+            } catch (error) {
+                console.error('Error deleting category:', error);
+                alert('Ошибка удаления');
+            }
         }
 
         // Инициализация
-        loadCategories();
+        loadData();
     </script>
 </body>
 </html>
