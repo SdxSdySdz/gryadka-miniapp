@@ -167,6 +167,19 @@ async def root():
     return RedirectResponse(url="/app")
 
 
+# Fallback редиректы для страниц без /app
+@app.get("/{page}")
+async def redirect_to_app(page: str):
+    """Редирект на /app/{page}"""
+    from fastapi.responses import RedirectResponse
+    # Только для известных страниц
+    if page in ["favorites", "cart", "profile", "orders"]:
+        return RedirectResponse(url=f"/app/{page}")
+    # Для остальных - 404
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "api.main:app",
