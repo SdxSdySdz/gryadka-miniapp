@@ -135,6 +135,27 @@ async def get_admin_page(page: str):
     return HTMLResponse(content=f"<h1>Page {page} not found</h1>", status_code=404)
 
 
+# Страницы Mini App (favorites, cart, profile, orders)
+@app.get("/app/{page}", response_class=HTMLResponse)
+async def get_app_page(page: str):
+    """Страницы Mini App"""
+    # Проверяем, не админка ли это
+    if page == "admin":
+        return await get_admin_index()
+
+    page_path = DOCS_DIR / f"{page}.html"
+    if page_path.exists():
+        content = page_path.read_text(encoding="utf-8")
+        content = content.replace('./config.js', '/app/config.js')
+        content = content.replace('./static/', '/app/static/')
+        # Замены для навигации
+        content = content.replace("'/'", "'/app'")
+        content = content.replace("'/" + "'", "'/app'")
+        content = content.replace("href=\"/\"", "href=\"/app\"")
+        return HTMLResponse(content=content)
+    return HTMLResponse(content=f"<h1>Page {page} not found</h1>", status_code=404)
+
+
 # Статические файлы Mini App
 app.mount("/app/static", StaticFiles(directory=str(DOCS_DIR / "static")), name="app_static")
 

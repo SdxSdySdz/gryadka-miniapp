@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Корзина - Грядка</title>
+    <link rel="stylesheet" href="./static/css/style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="./config.js"></script>
+    <style>
+        .page-header {
+            background: linear-gradient(135deg, #2e7d32 0%, var(--primary-green) 100%);
+            padding: var(--spacing);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--white);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-title {
+            font-size: 20px;
+            font-weight: bold;
+            flex: 1;
+        }
+        .clear-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .cart-container {
+            padding: var(--spacing);
+            padding-bottom: 180px;
+        }
+        .cart-item {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .cart-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: var(--background-light);
+        }
+        .cart-info {
+            flex: 1;
+        }
+        .cart-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        .cart-price {
+            color: var(--text-light);
+            font-size: 13px;
+        }
+        .cart-total {
+            color: var(--primary-green);
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 4px;
+        }
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .qty-btn {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--primary-green);
+            background: white;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-green);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .qty-btn:active {
+            background: var(--primary-green);
+            color: white;
+        }
+        .qty-value {
+            font-weight: 600;
+            font-size: 16px;
+            min-width: 40px;
+            text-align: center;
+        }
+        .remove-btn {
+            background: none;
+            border: none;
+            color: var(--badge-sale);
+            cursor: pointer;
+            padding: 8px;
+        }
+        .cart-summary {
+            position: fixed;
+            bottom: 70px;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            padding: var(--spacing);
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--background-light);
+        }
+        .checkout-btn {
+            width: 100%;
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .checkout-btn:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        .min-order-warning {
+            background: rgba(255, 152, 0, 0.1);
+            border: 1px solid var(--accent-orange);
+            color: var(--accent-orange);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button class="back-btn" onclick="goBack()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+        </button>
+        <h1 class="page-title">Корзина</h1>
+        <button class="clear-btn" onclick="clearCart()">Очистить</button>
+    </div>
+
+    <div class="cart-container" id="cartContainer">
+        <div class="loading">Загрузка...</div>
+    </div>
+
+    <div class="cart-summary" id="cartSummary" style="display: none;">
+        <div id="minOrderWarning"></div>
+        <div class="summary-row">
+            <span>Товаров:</span>
+            <span id="itemsCount">0</span>
+        </div>
+        <div class="summary-total">
+            <span>Итого:</span>
+            <span id="totalPrice">0 ₽</span>
+        </div>
+        <button class="checkout-btn" id="checkoutBtn" onclick="checkout()">Оформить заказ</button>
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-item" onclick="navigateTo('')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="nav-label">Главная</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('favorites')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span class="nav-label">Избранное</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('orders')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span class="nav-label">Заказы</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('profile')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="nav-label">Профиль</span>
+        </button>
+    </nav>
+
+    <script>
+        let tg = null;
+        let user = null;
+        let userId = null;
+        let cartItems = [];
+        let minOrderAmount = 500;
+
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.ready();
+                user = tg.initDataUnsafe?.user || null;
+                userId = user ? user.id : null;
+            }
+        } catch (e) {
+            console.warn('Telegram init error:', e);
+        }
+
+        const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : window.location.origin;
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function navigateTo(page) {
+            window.location.href = page ? '/app/' + page : '/app';
+        }
+
+        async function loadCart() {
+            const container = document.getElementById('cartContainer');
+            const summary = document.getElementById('cartSummary');
+
+            if (!userId) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔐</div>
+                        <div>Войдите через Telegram для просмотра корзины</div>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cart/${userId}`);
+                cartItems = await response.json();
+
+                if (!cartItems || cartItems.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">🛒</div>
+                            <div>Корзина пуста</div>
+                            <p style="margin-top: 8px; font-size: 14px;">Добавьте товары из каталога</p>
+                        </div>
+                    `;
+                    summary.style.display = 'none';
+                    return;
+                }
+
+                renderCart();
+                updateSummary();
+                summary.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading cart:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">😕</div>
+                        <div>Ошибка загрузки корзины</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cartContainer');
+            const unitNames = { kg: 'кг', piece: 'шт', package: 'уп', box: 'ящ' };
+
+            container.innerHTML = cartItems.map(item => `
+                <div class="cart-item" id="cart-${item.id}">
+                    <img src="${item.product_image || '/static/images/placeholder.jpg'}"
+                         alt="${item.product_name}"
+                         class="cart-image"
+                         onerror="this.src='/static/images/placeholder.jpg'">
+                    <div class="cart-info">
+                        <div class="cart-name">${item.product_name}</div>
+                        <div class="cart-price">${item.price_per_unit.toFixed(0)} ₽ / ${unitNames[item.unit] || item.unit}</div>
+                        <div class="cart-total">${item.total.toFixed(0)} ₽</div>
+                        <div class="quantity-controls">
+                            <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity - 1})">−</button>
+                            <span class="qty-value">${item.quantity} ${unitNames[item.unit] || item.unit}</span>
+                            <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity + 1})">+</button>
+                            <button class="remove-btn" onclick="removeItem(${item.id})">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSummary() {
+            const total = cartItems.reduce((sum, item) => sum + item.total, 0);
+            const count = cartItems.reduce((sum, item) => sum + Math.ceil(item.quantity), 0);
+
+            document.getElementById('itemsCount').textContent = count;
+            document.getElementById('totalPrice').textContent = total.toFixed(0) + ' ₽';
+
+            const warning = document.getElementById('minOrderWarning');
+            const checkoutBtn = document.getElementById('checkoutBtn');
+
+            if (total < minOrderAmount) {
+                warning.innerHTML = `<div class="min-order-warning">Минимальная сумма заказа: ${minOrderAmount} ₽. Добавьте ещё на ${(minOrderAmount - total).toFixed(0)} ₽</div>`;
+                checkoutBtn.disabled = true;
+            } else {
+                warning.innerHTML = '';
+                checkoutBtn.disabled = false;
+            }
+        }
+
+        async function updateQuantity(itemId, newQuantity) {
+            if (!userId) return;
+
+            try {
+                if (newQuantity <= 0) {
+                    await removeItem(itemId);
+                    return;
+                }
+
+                await fetch(`${API_BASE_URL}/api/cart/${userId}/${itemId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quantity: newQuantity })
+                });
+
+                // Обновляем локально
+                const item = cartItems.find(i => i.id === itemId);
+                if (item) {
+                    item.quantity = newQuantity;
+                    item.total = newQuantity * item.price_per_unit;
+                }
+                renderCart();
+                updateSummary();
+
+            } catch (error) {
+                console.error('Error updating quantity:', error);
+            }
+        }
+
+        async function removeItem(itemId) {
+            if (!userId) return;
+
+            try {
+                await fetch(`${API_BASE_URL}/api/cart/${userId}/${itemId}`, {
+                    method: 'DELETE'
+                });
+
+                cartItems = cartItems.filter(i => i.id !== itemId);
+
+                if (cartItems.length === 0) {
+                    loadCart();
+                } else {
+                    renderCart();
+                    updateSummary();
+                }
+
+            } catch (error) {
+                console.error('Error removing item:', error);
+            }
+        }
+
+        async function clearCart() {
+            if (!userId || !confirm('Очистить корзину?')) return;
+
+            try {
+                await fetch(`${API_BASE_URL}/api/cart/${userId}`, {
+                    method: 'DELETE'
+                });
+                cartItems = [];
+                loadCart();
+            } catch (error) {
+                console.error('Error clearing cart:', error);
+            }
+        }
+
+        function checkout() {
+            // TODO: Переход на страницу оформления заказа
+            alert('Оформление заказа будет добавлено позже');
+        }
+
+        loadCart();
+    </script>
+</body>
+</html>

@@ -323,11 +323,11 @@ function selectCategory(categoryId) {
 }
 
 function openProduct(productId) {
-    window.location.href = `/product/${productId}`;
+    window.location.href = `/app/product/${productId}`;
 }
 
 function openCart() {
-    window.location.href = '/cart';
+    window.location.href = '/app/cart';
 }
 
 function searchProducts() {
@@ -340,7 +340,7 @@ function searchProducts() {
 
 // Навигация
 function navigateTo(page) {
-    window.location.href = `/${page}`;
+    window.location.href = page ? `/app/${page}` : '/app';
 }
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================

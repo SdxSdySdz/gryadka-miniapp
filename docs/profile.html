@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Профиль - Грядка</title>
+    <link rel="stylesheet" href="./static/css/style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="./config.js"></script>
+    <style>
+        .page-header {
+            background: linear-gradient(135deg, #2e7d32 0%, var(--primary-green) 100%);
+            padding: var(--spacing);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--white);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .profile-container {
+            padding: var(--spacing);
+        }
+        .profile-card {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+        }
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid var(--primary-green);
+            margin-bottom: 16px;
+            background: var(--background-light);
+        }
+        .profile-avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-green), #66BB6A);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            color: white;
+            font-size: 48px;
+            font-weight: bold;
+        }
+        .profile-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .profile-username {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        .profile-menu {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--background-light);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+        .menu-item:active {
+            background: var(--background-light);
+        }
+        .menu-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 20px;
+        }
+        .menu-icon.green { background: rgba(76, 175, 80, 0.15); }
+        .menu-icon.orange { background: rgba(255, 152, 0, 0.15); }
+        .menu-icon.blue { background: rgba(33, 150, 243, 0.15); }
+        .menu-icon.red { background: rgba(244, 67, 54, 0.15); }
+        .menu-text {
+            flex: 1;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        .menu-arrow {
+            color: var(--text-light);
+            font-size: 20px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button class="back-btn" onclick="goBack()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+        </button>
+        <h1 class="page-title">Профиль</h1>
+    </div>
+
+    <div class="profile-container" id="profileContainer">
+        <div class="loading">Загрузка...</div>
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-item" onclick="navigateTo('')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span class="nav-label">Главная</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('favorites')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span class="nav-label">Избранное</span>
+        </button>
+        <button class="nav-item" onclick="navigateTo('orders')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span class="nav-label">Заказы</span>
+        </button>
+        <button class="nav-item active" onclick="navigateTo('profile')">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span class="nav-label">Профиль</span>
+        </button>
+    </nav>
+
+    <script>
+        let tg = null;
+        let user = null;
+
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.ready();
+                user = tg.initDataUnsafe?.user || null;
+            }
+        } catch (e) {
+            console.warn('Telegram init error:', e);
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function navigateTo(page) {
+            window.location.href = page ? '/app/' + page : '/app';
+        }
+
+        function renderProfile() {
+            const container = document.getElementById('profileContainer');
+
+            if (!user) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔐</div>
+                        <div>Откройте приложение через Telegram</div>
+                        <p style="margin-top: 8px; font-size: 14px;">Профиль доступен только в Telegram</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const firstName = user.first_name || '';
+            const lastName = user.last_name || '';
+            const fullName = `${firstName} ${lastName}`.trim() || 'Пользователь';
+            const username = user.username ? `@${user.username}` : '';
+            const photoUrl = user.photo_url || null;
+            const initials = (firstName.charAt(0) + (lastName.charAt(0) || firstName.charAt(1) || '')).toUpperCase();
+
+            const avatarHtml = photoUrl
+                ? `<img src="${photoUrl}" alt="Аватар" class="profile-avatar" onerror="this.outerHTML='<div class=\\'profile-avatar-placeholder\\'>${initials}</div>'">`
+                : `<div class="profile-avatar-placeholder">${initials}</div>`;
+
+            container.innerHTML = `
+                <div class="profile-card">
+                    ${avatarHtml}
+                    <div class="profile-name">${fullName}</div>
+                    ${username ? `<div class="profile-username">${username}</div>` : ''}
+                </div>
+
+                <div class="profile-menu">
+                    <div class="menu-item" onclick="navigateTo('orders')">
+                        <div class="menu-icon green">📦</div>
+                        <div class="menu-text">Мои заказы</div>
+                        <div class="menu-arrow">›</div>
+                    </div>
+                    <div class="menu-item" onclick="navigateTo('favorites')">
+                        <div class="menu-icon orange">💚</div>
+                        <div class="menu-text">Избранное</div>
+                        <div class="menu-arrow">›</div>
+                    </div>
+                    <div class="menu-item" onclick="openSupport()">
+                        <div class="menu-icon blue">💬</div>
+                        <div class="menu-text">Поддержка</div>
+                        <div class="menu-arrow">›</div>
+                    </div>
+                    <div class="menu-item" onclick="openFAQ()">
+                        <div class="menu-icon green">❓</div>
+                        <div class="menu-text">Частые вопросы</div>
+                        <div class="menu-arrow">›</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function openSupport() {
+            alert('Функция поддержки будет добавлена позже');
+        }
+
+        function openFAQ() {
+            alert('FAQ будет добавлен позже');
+        }
+
+        renderProfile();
+    </script>
+</body>
+</html>
